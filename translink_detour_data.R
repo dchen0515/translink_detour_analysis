@@ -2,6 +2,8 @@ library(RProtoBuf)
 library(ggplot2)
 library(stringr)
 library(dplyr)
+library(purrr)
+library(tidyr)
 
 # Load the GTFS-RT proto definition
 readProtoFiles("gtfs-realtime.proto")
@@ -33,6 +35,31 @@ nrow(detours_df)
 str(detours_df)
 
 View(detours_df)
+
+# structured detour table with real GTFS identifiers
+detours_entities <- lapply(alerts$entity, function(e) {
+  alert <- e$alert
+  
+  if (!is.null(alert$effect) && alert$effect == 4) {
+    ents <- alert$informed_entity
+    
+    if (length(ents) == 0) return(NULL)
+    
+    do.call(rbind, lapply(ents, function(ent) {
+      data.frame(
+        id = e$id,
+        route_id = if (!is.null(ent$route_id)) ent$route_id else NA,
+        trip_id  = if (!is.null(ent$trip$trip_id)) ent$trip$trip_id else NA,
+        stop_id  = if (!is.null(ent$stop_id)) ent$stop_id else NA,
+        stringsAsFactors = FALSE
+      )
+    }))
+  } else {
+    NULL
+  }
+})
+View(detours_entities_df)
+
 
 # Sorted table of detours
 detours_df$route <- sub(" .*", "", detours_df$header)
