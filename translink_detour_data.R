@@ -37,6 +37,9 @@ str(detours_df)
 View(detours_df)
 
 # structured detour table with real GTFS identifiers
+library(purrr)
+library(tidyr)
+
 detours_entities <- lapply(alerts$entity, function(e) {
   alert <- e$alert
   
@@ -58,6 +61,12 @@ detours_entities <- lapply(alerts$entity, function(e) {
     NULL
   }
 })
+
+detours_entities_df <- do.call(rbind, detours_entities)
+detours_entities_df$route_id <- as.character(detours_entities_df$route_id)
+detours_entities_df$trip_id  <- as.character(detours_entities_df$trip_id)
+detours_entities_df$stop_id  <- as.character(detours_entities_df$stop_id)
+
 View(detours_entities_df)
 
 
@@ -68,12 +77,13 @@ sort(table(detours_df$route), decreasing = TRUE)
 # Fix route extraction
 detours_df$route <- str_extract(detours_df$header, "(R\\d+|N\\d+|\\d+)")
 
-library(ggplot2)
-
 # reorder routes by frequency
 detours_df$route <- factor(detours_df$route,
                            levels = names(sort(table(detours_df$route))))
 
+## PRELIMINARY VISUALIZATIONS
+
+# bar chart showing detours by bus route
 print(
   ggplot(detours_df, aes(x = route)) +
     geom_bar(width = 0.7) +
@@ -133,6 +143,35 @@ print(ggplot(detours_df, aes(x = cause)) +
         theme_minimal()
 )
 
+## LINKING WITH STATIC GFTS FILES AND ENSURE THEY ARE TYPE CHAR
+routes <- read.csv("routes.txt")
+trips <- read.csv("trips.txt")
+stops <- read.csv("stops.txt")
+
+routes$route_id <- as.character(routes$route_id)
+trips$trip_id   <- as.character(trips$trip_id)
+stops$stop_id   <- as.character(stops$stop_id)
+
+## FULL DETOURS TABLE
+detours_full <- detours_df %>%
+  left_join(detours_entities_df, by = "id") %>%
+  left_join(routes, by = "route_id") %>%
+  left_join(stops, by = "stop_id") %>%
+  left_join(trips, by = "trip_id")
+
+View(detours_full)
+
+### FURTHER ANALYSIS BELOW HERE
+## Top Detoured Routes
+top_detours <- detours_full %>%
+  count(route_short_name, sort = TRUE)
+View(top_detours)
+
+## Analysis of most detoured bus route (49 Metrotown Station/UBC)
+detours_49 <- detours_full %>%
+  filter(route_short_name == "049") %>%
+  count(stop_name, sort = TRUE)
+View(detours_49)
 
 # ggsave(
 #   filename = "detour_count_distribution.png",
