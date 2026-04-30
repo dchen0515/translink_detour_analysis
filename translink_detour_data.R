@@ -5,6 +5,7 @@ library(dplyr)
 library(purrr)
 library(tidyr)
 library(sf)
+library(ggspatial)
 
 # Load the GTFS-RT proto definition
 readProtoFiles("gtfs-realtime.proto")
@@ -162,6 +163,25 @@ detours_full <- detours_df %>%
 
 View(detours_full)
 
+### Load and convert GTFS route shapes
+# Load shapes.txt
+shapes <- read.csv("shapes.txt")
+
+# Convert shape points to sf
+shapes_sf <- st_as_sf(
+  shapes,
+  coords = c("shape_pt_lon", "shape_pt_lat"),
+  crs = 4326,
+  remove = FALSE
+)
+
+# Convert points → ordered lines for each shape_id
+shapes_lines <- shapes_sf %>%
+  arrange(shape_id, shape_pt_sequence) %>%
+  group_by(shape_id) %>%
+  summarise(do_union = FALSE) %>%
+  st_cast("LINESTRING")
+
 ### FURTHER ANALYSIS BELOW HERE
 ## Top Detoured Routes
 top_detours <- detours_full %>%
@@ -223,8 +243,31 @@ p <- ggplot(detours_all_sf) +
 
 print(p)
 
+### COMPLETE MAPPING OF ALL DETOURED ROUTES IN METRO VANCOUVER
+library(ggspatial)
+
+p2 <- ggplot() +
+  annotation_map_tile(type = "osm") +   # basemap
+  geom_sf(data = shapes_lines, color = "grey40", size = 0.3, alpha = 0.5) +  # bus routes
+  geom_sf(
+    data = detours_all_sf,
+    aes(color = route_short_name, size = n),
+    alpha = 0.9
+  ) +
+  coord_sf() +
+  theme_minimal() +
+  labs(
+    title = "Metro Vancouver Bus Routes and Detour Hotspots",
+    subtitle = "Basemap + GTFS route shapes + detour points",
+    color = "Route",
+    size = "Detours"
+  )
+
+print(p2)
+
+
 ggsave(
-  filename = "metro_van_detour_hotspots_map.png",
+  filename = "complete_metro_van_detour_hotspots_map.png",
   plot = last_plot(),
   width = 10,        # inches
   height = 6,        # inches
