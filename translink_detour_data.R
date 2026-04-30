@@ -4,6 +4,7 @@ library(stringr)
 library(dplyr)
 library(purrr)
 library(tidyr)
+library(sf)
 
 # Load the GTFS-RT proto definition
 readProtoFiles("gtfs-realtime.proto")
@@ -173,11 +174,35 @@ detours_49 <- detours_full %>%
   count(stop_name, sort = TRUE)
 View(detours_49)
 
-# ggsave(
-#   filename = "detour_count_distribution.png",
-#   plot = last_plot(),
-#   width = 10,        # inches
-#   height = 6,        # inches
-#   dpi = 600,         # high resolution
-#   units = "in"
-# )
+## Map of detouring clusters
+detours_49_map <- detours_full %>%
+  filter(route_short_name == "049") %>%
+  filter(!is.na(stop_lat), !is.na(stop_lon))
+
+detours_49_sf <- st_as_sf(
+  detours_49_map,
+  coords = c("stop_lon", "stop_lat"),
+  crs = 4326,
+  remove = FALSE
+)
+
+## Plot showing detour hotspots for route 49
+print(
+  ggplot(detours_49_sf) +
+    geom_sf(color = "red", size = 3) +
+    coord_sf() +
+    theme_minimal() +
+    labs(
+      title = "Detour Hotspots for Route 49",
+      subtitle = "Based on GTFS-Realtime detour alerts"
+    )
+)
+
+ggsave(
+  filename = "49_detour_hotspots_map.png",
+  plot = last_plot(),
+  width = 10,        # inches
+  height = 6,        # inches
+  dpi = 600,         # high resolution
+  units = "in"
+)
