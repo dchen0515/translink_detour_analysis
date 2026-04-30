@@ -193,7 +193,11 @@ p2 <- ggplot() +
     fontface = "bold",
     color = "black",
     fill = "white",
-    label.size = 0.2
+    label.size = 0.2,
+    box.padding = 0.8,     # more room around the label
+    point.padding = 0.8,   # more room around the anchor point
+    force = 2,             # stronger repelling force
+    max.overlaps = Inf
   ) +
   
   scale_color_manual(values = type_colors) +
