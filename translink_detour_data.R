@@ -243,31 +243,59 @@ p <- ggplot(detours_all_sf) +
 
 print(p)
 
-### COMPLETE MAPPING OF ALL DETOURED ROUTES IN METRO VANCOUVER
-library(ggspatial)
+## CITY LABELS FOR MAP
+city_labels <- data.frame(
+  city = c("Vancouver", "Richmond", "Burnaby", "Surrey", "Delta",
+           "North Vancouver", "West Vancouver", "New Westminster"),
+  lon  = c(-123.10, -123.13, -122.97, -122.85, -123.00,
+           -123.07, -123.17, -122.91),
+  lat  = c(49.25, 49.17, 49.25, 49.12, 49.09,
+           49.32, 49.33, 49.21)
+)
 
+city_labels_sf <- st_as_sf(city_labels, coords = c("lon", "lat"), crs = 4326)
+
+### COMPLETE MAPPING OF ALL DETOURED ROUTES IN METRO VANCOUVER
 p2 <- ggplot() +
   annotation_map_tile(type = "osm") +   # basemap
-  geom_sf(data = shapes_lines, color = "grey40", size = 0.3, alpha = 0.5) +  # bus routes
+  
+  # background bus routes (faint)
+  geom_sf(
+    data = shapes_lines,
+    color = "grey70",
+    size = 0.2,
+    alpha = 0.4
+  ) +
+  
+  # detour points (bright + sized)
   geom_sf(
     data = detours_all_sf,
     aes(color = route_short_name, size = n),
     alpha = 0.9
   ) +
+  
+  # city labels
+  geom_sf_text(
+    data = city_labels_sf,
+    aes(label = city),
+    size = 5,
+    fontface = "bold",
+    color = "black",
+    alpha = 0.8
+  ) +
+  
   coord_sf() +
   theme_minimal() +
   labs(
     title = "Metro Vancouver Bus Routes and Detour Hotspots",
-    subtitle = "Basemap + GTFS route shapes + detour points",
+    subtitle = "Detoured routes highlighted; background network shown faintly",
     color = "Route",
     size = "Detours"
   )
 
-print(p2)
-
 
 ggsave(
-  filename = "complete_metro_van_detour_hotspots_map.png",
+  filename = "complete_metro_van_detour_hotspots_and_route_map.png",
   plot = last_plot(),
   width = 10,        # inches
   height = 6,        # inches
