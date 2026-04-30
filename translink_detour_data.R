@@ -198,8 +198,33 @@ print(
     )
 )
 
+### MAPPING ALL DETOURED ROUTES IN METRO VANCOUVER
+detours_all_counts <- detours_full %>%
+  filter(!is.na(stop_lat), !is.na(stop_lon)) %>%
+  count(route_short_name, stop_id, stop_name, stop_lat, stop_lon)
+
+detours_all_sf <- st_as_sf(
+  detours_all_counts,
+  coords = c("stop_lon", "stop_lat"),
+  crs = 4326,
+  remove = FALSE
+)
+
+p <- ggplot(detours_all_sf) +
+  geom_sf(aes(color = route_short_name, size = n), alpha = 0.8) +
+  coord_sf() +
+  theme_minimal() +
+  labs(
+    title = "Metro Vancouver Detour Hotspots by Route",
+    subtitle = "Color = route, size = number of detours",
+    color = "Route",
+    size = "Detours"
+  )
+
+print(p)
+
 ggsave(
-  filename = "49_detour_hotspots_map.png",
+  filename = "metro_van_detour_hotspots_map.png",
   plot = last_plot(),
   width = 10,        # inches
   height = 6,        # inches
