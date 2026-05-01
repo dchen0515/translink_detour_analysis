@@ -164,7 +164,33 @@ city_labels <- data.frame(
            49.32, 49.33, 49.21)
 )
 
-city_labels_sf <- st_as_sf(city_labels, coords = c("lon", "lat"), crs = 4326)
+city_labels_sf <- city_labels %>% 
+  mutate(lon = lon, lat = lat) %>%   # keep numeric columns
+  st_as_sf(coords = c("lon", "lat"), crs = 4326, remove = FALSE)
+
+city_labels_sf <- city_labels_sf %>%
+  mutate(
+    lon_adj = lon + c(
+      -0.020,  # Vancouver
+      -0.012,  # Richmond
+      0.020,   # Burnaby
+      0.025,   # Surrey
+      -0.012,  # Delta
+      0.020,   # North Vancouver
+      -0.025,  # West Vancouver
+      0.015    # New Westminster
+    ),
+    lat_adj = lat + c(
+      0.012,   # Vancouver
+      -0.006,  # Richmond
+      0.020,   # Burnaby
+      -0.020,  # Surrey
+      -0.012,  # Delta
+      0.020,   # North Vancouver
+      0.012,   # West Vancouver
+      -0.012   # New Westminster
+    )
+  )
 
 ## ---------------------------------------------------------
 ## FINAL MAP
@@ -187,16 +213,15 @@ p2 <- ggplot() +
   
   geom_label_repel(
     data = city_labels_sf,
-    aes(label = city, geometry = geometry),
-    stat = "sf_coordinates",
-    size = 5,
+    aes(label = city, x = lon_adj, y = lat_adj),
+    size = 4,
     fontface = "bold",
     color = "black",
     fill = "white",
-    label.size = 0.2,
-    box.padding = 0.8,     # more room around the label
-    point.padding = 0.8,   # more room around the anchor point
-    force = 2,             # stronger repelling force
+    label.size = 0.3,
+    box.padding = 0.8,
+    point.padding = 0.8,
+    force = 2,
     max.overlaps = Inf
   ) +
   
