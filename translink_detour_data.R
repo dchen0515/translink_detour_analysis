@@ -248,11 +248,39 @@ p2 <- ggplot() +
 
 print(p2)
 
+## ---------------------------------------------------------
+## DETOURS PER ROUTE (BAR CHART)
+## ---------------------------------------------------------
+detours_by_route <- detours_full %>%
+  filter(!is.na(route_short_name)) %>%
+  count(route_short_name, sort = TRUE)
+
+p_routes <- ggplot(detours_by_route,
+                   aes(x = reorder(route_short_name, n), y = n)) +
+  geom_col(fill = "#1f78b4") +
+  coord_flip() +
+  labs(
+    title = "Detours per Route",
+    x = "Route",
+    y = "Number of Detours"
+  ) +
+  theme_minimal(base_size = 13)
+
+print(p_routes)
+
 ggsave(
-  filename = "complete_colour_coded_metro_van_detour_hotspots_and_route_map.png",
-  plot = p2,
-  width = 10,
+  filename = "detours_per_route.png",
+  plot = p_routes,
+  width = 8,
   height = 6,
-  dpi = 600,
-  units = "in"
+  dpi = 600
 )
+
+# ggsave(
+#   filename = "complete_colour_coded_metro_van_detour_hotspots_and_route_map.png",
+#   plot = p2,
+#   width = 10,
+#   height = 6,
+#   dpi = 600,
+#   units = "in"
+# )
