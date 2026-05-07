@@ -10,6 +10,7 @@ library(tidyr)
 library(sf)
 library(ggspatial)
 library(ggrepel)
+library(magrittr)
 
 ## ---------------------------------------------------------
 ## ROUTE TYPE CLASSIFICATION (MUST COME FIRST)
@@ -35,11 +36,11 @@ route_types <- data.frame(
 )
 
 type_colors <- c(
-  "RapidBus/B-Line" = "#00A651",
-  "Trolley"         = "#1f78b4",
-  "Local"           = "#e31a1c",
-  "Suburban/Express"= "#ff7f00",
-  "NightBus"        = "#6a3d9a",
+  "RapidBus/B-Line"   = "#00A651",
+  "Trolley"           = "#1f78b4",
+  "Local"             = "#e31a1c",
+  "Suburban/Express"  = "#ff7f00",
+  "NightBus"          = "#6a3d9a",
   "Community Shuttle" = "#b15928"
 )
 
@@ -66,30 +67,32 @@ detours <- lapply(alerts$entity, function(e) {
 detours_df <- do.call(rbind, detours)
 
 ## ---------------------------------------------------------
-## STRUCTURED DETOUR ENTITIES
+## STRUCTURED DETOUR ENTITIES (NO %||%)
 ## ---------------------------------------------------------
 detours_entities <- lapply(alerts$entity, function(e) {
   alert <- e$alert
   if (!is.null(alert$effect) && alert$effect == 4) {
     ents <- alert$informed_entity
     if (length(ents) == 0) return(NULL)
+    
     do.call(rbind, lapply(ents, function(ent) {
       data.frame(
         id       = e$id,
-        route_id = ent$route_id %||% NA,
-        trip_id  = ent$trip$trip_id %||% NA,
-        stop_id  = ent$stop_id %||% NA,
+        route_id = if (!is.null(ent$route_id)) ent$route_id else NA,
+        trip_id  = if (!is.null(ent$trip$trip_id)) ent$trip$trip_id else NA,
+        stop_id  = if (!is.null(ent$stop_id)) ent$stop_id else NA,
         stringsAsFactors = FALSE
       )
     }))
   } else NULL
 })
 
-detours_entities_df <- do.call(rbind, detours_entities)
-detours_entities_df <- mutate(detours_entities_df,
-                              route_id = as.character(route_id),
-                              trip_id  = as.character(trip_id),
-                              stop_id  = as.character(stop_id))
+detours_entities_df <- do.call(rbind, detours_entities) %>%
+  mutate(
+    route_id = as.character(route_id),
+    trip_id  = as.character(trip_id),
+    stop_id  = as.character(stop_id)
+  )
 
 ## ---------------------------------------------------------
 ## LOAD STATIC GTFS
@@ -137,6 +140,10 @@ shapes_lines_typed <- shapes_lines %>%
   left_join(routes %>% select(route_id, route_short_name), by = "route_id") %>%
   left_join(route_types,                                   by = "route_short_name")
 
+## (Optional) drop shapes with no type to remove NA from legend
+shapes_lines_typed <- shapes_lines_typed %>%
+  filter(!is.na(type))
+
 ## ---------------------------------------------------------
 ## DETOUR POINTS AS SF + JOIN TYPES
 ## ---------------------------------------------------------
@@ -153,7 +160,7 @@ detours_all_sf <- st_as_sf(
   left_join(route_types, by = "route_short_name")
 
 ## ---------------------------------------------------------
-## CITY LABELS
+## CITY LABELS (WITH ADJUSTED SF GEOMETRY)
 ## ---------------------------------------------------------
 city_labels <- data.frame(
   city = c("Vancouver", "Richmond", "Burnaby", "Surrey", "Delta",
@@ -164,11 +171,8 @@ city_labels <- data.frame(
            49.32, 49.33, 49.21)
 )
 
-city_labels_sf <- city_labels %>% 
-  mutate(lon = lon, lat = lat) %>%   # keep numeric columns
-  st_as_sf(coords = c("lon", "lat"), crs = 4326, remove = FALSE)
-
-city_labels_sf <- city_labels_sf %>%
+city_labels_sf <- city_labels %>%
+  st_as_sf(coords = c("lon", "lat"), crs = 4326, remove = FALSE) %>%
   mutate(
     lon_adj = lon + c(
       -0.020,  # Vancouver
@@ -189,6 +193,10 @@ city_labels_sf <- city_labels_sf %>%
       0.020,   # North Vancouver
       0.012,   # West Vancouver
       -0.012   # New Westminster
+    ),
+    geometry_adj = st_sfc(
+      mapply(function(x, y) st_point(c(x, y)), lon_adj, lat_adj, SIMPLIFY = FALSE),
+      crs = 4326
     )
   )
 
@@ -196,8 +204,10 @@ city_labels_sf <- city_labels_sf %>%
 ## FINAL MAP
 ## ---------------------------------------------------------
 p2 <- ggplot() +
-  annotation_map_tile(type = "osm") +
-  
+  annotation_map_tile(type = "cartolight") +  # faster/more reliable than osm
+  annotation_scale(location = "bl", width_hint = 0.25) +
+  annotation_north_arrow(location = "bl", which_north = "true",
+                         style = north_arrow_fancy_orienteering) +
   geom_sf(
     data = shapes_lines_typed,
     aes(color = type),
@@ -213,7 +223,8 @@ p2 <- ggplot() +
   
   geom_label_repel(
     data = city_labels_sf,
-    aes(label = city, x = lon_adj, y = lat_adj),
+    aes(label = city, geometry = geometry_adj),
+    stat = "sf_coordinates",
     size = 4,
     fontface = "bold",
     color = "black",
