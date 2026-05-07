@@ -11,9 +11,11 @@ library(sf)
 library(ggspatial)
 library(ggrepel)
 library(magrittr)
+library(cancensus)
+library(rmapshaper)
 
 ## ---------------------------------------------------------
-## ROUTE TYPE CLASSIFICATION (MUST COME FIRST)
+## ROUTE TYPE CLASSIFICATION
 ## ---------------------------------------------------------
 route_types <- data.frame(
   route_short_name = c(
@@ -67,7 +69,7 @@ detours <- lapply(alerts$entity, function(e) {
 detours_df <- do.call(rbind, detours)
 
 ## ---------------------------------------------------------
-## STRUCTURED DETOUR ENTITIES (NO %||%)
+## STRUCTURED DETOUR ENTITIES
 ## ---------------------------------------------------------
 detours_entities <- lapply(alerts$entity, function(e) {
   alert <- e$alert
@@ -138,14 +140,11 @@ shapes_lines <- shapes_sf %>%
 shapes_lines_typed <- shapes_lines %>%
   left_join(trips  %>% select(route_id, shape_id),         by = "shape_id") %>%
   left_join(routes %>% select(route_id, route_short_name), by = "route_id") %>%
-  left_join(route_types,                                   by = "route_short_name")
-
-## (Optional) drop shapes with no type to remove NA from legend
-shapes_lines_typed <- shapes_lines_typed %>%
+  left_join(route_types,                                   by = "route_short_name") %>%
   filter(!is.na(type))
 
 ## ---------------------------------------------------------
-## DETOUR POINTS AS SF + JOIN TYPES
+## DETOUR POINTS AS SF
 ## ---------------------------------------------------------
 detours_all_counts <- detours_full %>%
   filter(!is.na(stop_lat), !is.na(stop_lon)) %>%
@@ -160,7 +159,7 @@ detours_all_sf <- st_as_sf(
   left_join(route_types, by = "route_short_name")
 
 ## ---------------------------------------------------------
-## CITY LABELS (WITH ADJUSTED SF GEOMETRY)
+## CITY LABELS (FIXED GEOMETRY)
 ## ---------------------------------------------------------
 city_labels <- data.frame(
   city = c("Vancouver", "Richmond", "Burnaby", "Surrey", "Delta",
@@ -172,59 +171,64 @@ city_labels <- data.frame(
 )
 
 city_labels_sf <- city_labels %>%
-  st_as_sf(coords = c("lon", "lat"), crs = 4326, remove = FALSE) %>%
   mutate(
-    lon_adj = lon + c(
-      -0.020,  # Vancouver
-      -0.012,  # Richmond
-      0.020,   # Burnaby
-      0.025,   # Surrey
-      -0.012,  # Delta
-      0.020,   # North Vancouver
-      -0.025,  # West Vancouver
-      0.015    # New Westminster
-    ),
-    lat_adj = lat + c(
-      0.012,   # Vancouver
-      -0.006,  # Richmond
-      0.020,   # Burnaby
-      -0.020,  # Surrey
-      -0.012,  # Delta
-      0.020,   # North Vancouver
-      0.012,   # West Vancouver
-      -0.012   # New Westminster
-    ),
-    geometry_adj = st_sfc(
-      mapply(function(x, y) st_point(c(x, y)), lon_adj, lat_adj, SIMPLIFY = FALSE),
-      crs = 4326
-    )
-  )
+    lon_adj = lon + c(-0.020, -0.012, 0.020, 0.025, -0.012, 0.020, -0.025, 0.015),
+    lat_adj = lat + c(0.012, -0.006, 0.020, -0.020, -0.012, 0.020, 0.012, -0.012)
+  ) %>%
+  st_as_sf(coords = c("lon_adj", "lat_adj"), crs = 4326, remove = FALSE)
 
 ## ---------------------------------------------------------
-## FINAL MAP
+## LOAD METRO VANCOUVER BOUNDARY (STATCAN VIA API)
+## ---------------------------------------------------------
+mv_boundary <- get_census(
+  dataset = "CA21",
+  regions = list(CMA = "59933"),   # Metro Vancouver CMA
+  level = "CSD",
+  geo_format = "sf"
+)
+
+mv_boundary <- rmapshaper::ms_simplify(mv_boundary, keep = 0.1)
+
+## ---------------------------------------------------------
+## PROJECT ALL SPATIAL LAYERS TO A PROJECTED CRS
+## ---------------------------------------------------------
+
+target_crs <- 26910  # UTM Zone 10N
+
+mv_boundary_proj        <- st_transform(mv_boundary, target_crs)
+shapes_lines_typed_proj <- st_transform(shapes_lines_typed, target_crs)
+detours_all_sf_proj     <- st_transform(detours_all_sf, target_crs)
+city_labels_sf_proj     <- st_transform(city_labels_sf, target_crs)
+
+# Extract numeric coordinates for labels
+city_coords <- st_coordinates(city_labels_sf_proj)
+city_labels_sf_proj$x <- city_coords[,1]
+city_labels_sf_proj$y <- city_coords[,2]
+
+## ---------------------------------------------------------
+## FINAL MAP (PROJECTED CRS, NO WARNINGS, NO VIEWPORT ERRORS)
 ## ---------------------------------------------------------
 p2 <- ggplot() +
-  annotation_map_tile(type = "cartolight") +  # faster/more reliable than osm
-  annotation_scale(location = "bl", width_hint = 0.25) +
-  annotation_north_arrow(location = "bl", which_north = "true",
-                         style = north_arrow_fancy_orienteering) +
   geom_sf(
-    data = shapes_lines_typed,
+    data = mv_boundary_proj,
+    fill = "grey95",
+    color = "white",
+    size = 0.3
+  ) +
+  geom_sf(
+    data = shapes_lines_typed_proj,
     aes(color = type),
     size = 0.3,
     alpha = 0.35
   ) +
-  
   geom_sf(
-    data = detours_all_sf,
+    data = detours_all_sf_proj,
     aes(color = type, size = n),
     alpha = 0.9
   ) +
-  
   geom_label_repel(
-    data = city_labels_sf,
-    aes(label = city, geometry = geometry_adj),
-    stat = "sf_coordinates",
+    data = city_labels_sf_proj,
+    aes(x = x, y = y, label = city),
     size = 4,
     fontface = "bold",
     color = "black",
@@ -234,6 +238,20 @@ p2 <- ggplot() +
     point.padding = 0.8,
     force = 2,
     max.overlaps = Inf
+  ) +
+  
+  # scale bar + north arrow
+  annotation_scale(
+    location = "bl",
+    width_hint = 0.25,
+    text_cex = 0.8
+  ) +
+  annotation_north_arrow(
+    location = "tl",
+    which_north = "true",
+    style = north_arrow_fancy_orienteering,
+    height = unit(1.2, "cm"),
+    width = unit(1.2, "cm")
   ) +
   
   scale_color_manual(values = type_colors) +
@@ -273,14 +291,5 @@ ggsave(
   plot = p_routes,
   width = 8,
   height = 6,
-  dpi = 600
+  dpi = 300
 )
-
-# ggsave(
-#   filename = "complete_colour_coded_metro_van_detour_hotspots_and_route_map.png",
-#   plot = p2,
-#   width = 10,
-#   height = 6,
-#   dpi = 600,
-#   units = "in"
-# )
