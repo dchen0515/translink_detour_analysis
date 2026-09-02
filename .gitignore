@@ -1,4 +1,17 @@
+# RStudio project files
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
+*.Rproj
+
+# Temporary data files (optional)
+*.csv
+*.tsv
+*.zip
+
+# Temporary protobuf files (optional)
+*.pb
+
+# Temporary images (optional)
+*.png
