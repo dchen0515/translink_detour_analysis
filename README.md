@@ -17,6 +17,38 @@ This project analyzes bus detours across Metro Vancouver using TransLink’s GTF
 
 The goal is to identify where and when detours occur most frequently, and how they vary across routes, corridors, and neighbourhoods.
 
+## **How to Run the Analysis**
+
+1. **Clone the repository**
+   ```
+   git clone https://github.com/dchen0515/translink_detour_analysis.git
+   ```
+
+2. **Open the project in RStudio**
+   - Double‑click `translink_detour_analysis.Rproj`.
+
+3. **Install required R packages**
+   ```
+   install.packages(c("tidyverse", "sf", "ggplot2", "lubridate"))
+   ```
+   
+4. **Ensure GTFS data is present**
+   - All GTFS text files must be in the `data/` folder, including:
+     - `stop_times.txt`  
+     - `trips.txt`  
+     - `stops.txt`  
+     - `routes.txt`  
+     - and all other GTFS components used by the script.
+
+5. **Run the main analysis script**
+   ```
+   source("src/translink_detour_data.R")
+   ```
+
+6. **View outputs**
+   - Maps are saved in `results/maps/`
+   - Plots are saved in `results/plots/`
+
 ### **Next Steps**
 1. **Map detour hotspots for additional major routes**  
    Expand the hotspot analysis beyond the initial set of routes to build a region-wide detour profile.
