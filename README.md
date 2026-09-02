@@ -19,35 +19,77 @@ The goal is to identify where and when detours occur most frequently, and how th
 
 ## **How to Run the Analysis**
 
-1. **Clone the repository**
-   ```
-   git clone https://github.com/dchen0515/translink_detour_analysis.git
-   ```
+### **1. Clone the repository**
+```bash
+git clone https://github.com/dchen0515/translink_detour_analysis.git
+```
 
-2. **Open the project in RStudio**
-   - Double‑click `translink_detour_analysis.Rproj`.
+### **2. Open the project in RStudio**
+Double‑click:
 
-3. **Install required R packages**
-   ```
-   install.packages(c("tidyverse", "sf", "ggplot2", "lubridate"))
-   ```
-   
-4. **Ensure GTFS data is present**
-   - All GTFS text files must be in the `data/` folder, including:
-     - `stop_times.txt`  
-     - `trips.txt`  
-     - `stops.txt`  
-     - `routes.txt`  
-     - and all other GTFS components used by the script.
+```
+translink_detour_analysis.Rproj
+```
 
-5. **Run the main analysis script**
-   ```
-   source("src/translink_detour_data.R")
-   ```
+### **3. Install required R packages**
+Your script uses the following libraries:
 
-6. **View outputs**
-   - Maps are saved in `results/maps/`
-   - Plots are saved in `results/plots/`
+```
+install.packages(c(
+  "RProtoBuf", "ggplot2", "stringr", "dplyr", "purrr", "tidyr",
+  "sf", "ggspatial", "ggrepel", "magrittr", "cancensus", "rmapshaper"
+))
+```
+
+### **4. Set up cancensus API access**
+This is required for downloading Metro Vancouver boundaries.
+
+```
+cancensus::set_cancensus_api_key("YOUR_API_KEY")
+```
+
+You can obtain a key from:  
+(https://censusmapper.ca/api)
+
+### **5. Ensure GTFS data is present in the `data/` folder**
+
+Required files:
+
+```
+data/routes.txt
+data/trips.txt
+data/stops.txt
+data/shapes.txt
+data/stop_times.txt
+data/gtfs-realtime.proto
+data/translink_gtfsalerts.pb
+```
+
+These must match the GTFS version noted in the README.
+
+### **6. Run the analysis script**
+```
+source("src/translink_detour_data.R")
+```
+
+This script will:
+
+- load GTFS static + realtime data  
+- classify routes  
+- build spatial layers  
+- generate detour hotspot maps  
+- generate detour frequency plots  
+
+### **7. View outputs**
+Maps are saved to:
+```
+results/maps/
+```
+
+Plots are saved to:
+```
+results/plots/
+```
 
 ### **Next Steps**
 1. **Map detour hotspots for additional major routes**  
