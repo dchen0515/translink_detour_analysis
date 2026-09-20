@@ -32,7 +32,6 @@ translink_detour_analysis.Rproj
 ```
 
 ### **3. Install required R packages**
-Your script uses the following libraries:
 
 ```
 install.packages(c(
